@@ -1,0 +1,343 @@
+rules_version = '2';
+
+// Lanche Coletivo GDG Aracaju — ver docs/PLANO.md
+// Invariante nos dois lados (pledge <-> need <-> participant) via getAfter().
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------- caminhos
+    function evDoc(eid)            { return /databases/$(database)/documents/events/$(eid); }
+    function needDoc(eid, nid)     { return /databases/$(database)/documents/events/$(eid)/needs/$(nid); }
+    function pledgeDoc(eid, pid)   { return /databases/$(database)/documents/events/$(eid)/pledges/$(pid); }
+    function partDoc(eid, uid)     { return /databases/$(database)/documents/events/$(eid)/participants/$(uid); }
+    function cancelDoc(eid, cid)   { return /databases/$(database)/documents/events/$(eid)/cancelamentos/$(cid); }
+
+    // ---------------------------------------------------------------- identidade
+    function signedIn() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.email_verified == true;
+    }
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    function notBlocked() {
+      return !exists(/databases/$(database)/documents/blocked/$(request.auth.uid));
+    }
+    // Espelha lib/format.ts#primeiroNome (paridade testada).
+    function nomeEsperado() {
+      let n = request.auth.token.get('name', '').trim().split(' ')[0];
+      return (n.size() >= 1 && n.size() <= 40) ? n : 'Participante';
+    }
+    // Espelha lib/format.ts#norm.
+    function norm(s) {
+      return s.lower().trim()
+        .replace('[áàâãäÁÀÂÃÄ]', 'a').replace('[éèêëÉÈÊË]', 'e').replace('[íìîïÍÌÎÏ]', 'i')
+        .replace('[óòôõöÓÒÔÕÖ]', 'o').replace('[úùûüÚÙÛÜ]', 'u')
+        .replace('[çÇ]', 'c').replace('[ñÑ]', 'n');
+    }
+
+    // ---------------------------------------------------------------- evento
+    function evData(eid) { return get(evDoc(eid)).data; }
+    function eventoLegivel(eid) {
+      return evData(eid).status in ['aberto', 'fechado'] || isAdmin();
+    }
+    function eventoValido(d) {
+      return d.keys().hasOnly(['titulo', 'descricao', 'local', 'inicio', 'prazoContribuicoes', 'inscritos',
+                               'publicoPlanejado', 'margem', 'maxNecessidadesPorPessoa', 'status', 'criadoEm'])
+        && d.keys().hasAll(['titulo', 'descricao', 'local', 'inicio', 'prazoContribuicoes', 'inscritos',
+                            'publicoPlanejado', 'margem', 'maxNecessidadesPorPessoa', 'status', 'criadoEm'])
+        && d.titulo is string && d.titulo.size() >= 1 && d.titulo.size() <= 120
+        && d.descricao is string && d.descricao.size() <= 2000
+        && d.local is string && d.local.size() <= 200
+        && d.inicio is timestamp && d.prazoContribuicoes is timestamp
+        && d.prazoContribuicoes <= d.inicio
+        && d.inscritos is int && d.inscritos >= 0
+        && d.publicoPlanejado is int && d.publicoPlanejado >= 1 && d.publicoPlanejado <= 1000
+        && d.margem is number && d.margem >= 0 && d.margem <= 100
+        && d.maxNecessidadesPorPessoa is int && d.maxNecessidadesPorPessoa >= 1 && d.maxNecessidadesPorPessoa <= 20
+        && d.status in ['rascunho', 'aberto', 'fechado']
+        && d.criadoEm is timestamp;
+    }
+
+    match /events/{eid} {
+      allow read: if resource.data.status in ['aberto', 'fechado'] || isAdmin();
+      allow create: if isAdmin() && eventoValido(request.resource.data);
+      allow update: if isAdmin() && eventoValido(request.resource.data)
+                    && request.resource.data.criadoEm == resource.data.criadoEm;
+      allow delete: if false;
+
+      // ------------------------------------------------------------ need
+      function opcaoNormOk(d, i) {
+        return d.opcoes.size() <= i
+          || d.opcoesNorm[i] == norm(d.opcoes[i]);
+      }
+      function opcoesNormOk(d) {
+        return opcaoNormOk(d, 0) && opcaoNormOk(d, 1) && opcaoNormOk(d, 2) && opcaoNormOk(d, 3)
+          && opcaoNormOk(d, 4) && opcaoNormOk(d, 5) && opcaoNormOk(d, 6) && opcaoNormOk(d, 7)
+          && opcaoNormOk(d, 8) && opcaoNormOk(d, 9) && opcaoNormOk(d, 10) && opcaoNormOk(d, 11);
+      }
+      // Limite de 1000 expressões por avaliação: o norm() das opções (caro) só
+      // roda quando as opções mudam.
+      function needValida(d) {
+        return d.size() == 16
+          && d.keys().hasAll(['nome', 'categoria', 'unidade', 'meta', 'reservado', 'minPorPessoa', 'maxPorPessoa',
+                              'opcoes', 'maxPorOpcao', 'opcoesNorm', 'reservadoPorOpcao', 'permiteOutro',
+                              'nota', 'tags', 'ordem', 'ultimoUid'])
+          && d.nome.matches('.{1,80}')
+          && d.categoria in ['Bebidas', 'Salgados', 'Doces', 'Pães & Frios', 'Café & Cia', 'Descartáveis', 'Diversos']
+          && d.unidade.matches('.{1,40}')
+          && d.meta is int && d.meta >= 1 && d.meta <= 5000
+          && d.reservado is int && d.reservado >= 0
+          && d.minPorPessoa is int && d.minPorPessoa >= 1
+          && d.maxPorPessoa is int && d.maxPorPessoa >= d.minPorPessoa
+          && d.opcoes is list && d.opcoes.size() <= 12
+          && d.opcoes.toSet().size() == d.opcoes.size()
+          && d.opcoesNorm is list && d.opcoesNorm.size() == d.opcoes.size()
+          && (d.maxPorOpcao == null || (d.maxPorOpcao is int && d.maxPorOpcao >= 1))
+          && d.permiteOutro is bool
+          && d.nota.matches('(?s).{0,200}')
+          && d.tags is list && d.tags.size() <= 3 && d.tags.hasOnly(['vegano', 'sem-gluten', 'sem-lactose'])
+          && d.ordem is int
+          && (d.ultimoUid == null || d.ultimoUid is string)
+          // correção 3: sem "outro", as opções precisam comportar a meta
+          && (d.permiteOutro || d.opcoes.size() == 0 || d.maxPorOpcao == null
+              || d.opcoes.size() * d.maxPorOpcao >= d.meta)
+          && d.reservadoPorOpcao.keys().toSet() == d.opcoes.toSet();
+      }
+      function needCriavel(d) {
+        return needValida(d)
+          && opcoesNormOk(d)
+          && d.reservado == 0
+          && d.ultimoUid == null
+          && d.reservadoPorOpcao.values().toSet().hasOnly([0]);
+      }
+      // reservado>0: opções só são acrescentadas (prefixo preservado) e as novas entram com 0.
+      function porNovaOk(d, r, i) {
+        return d.opcoes.size() <= i || i < r.opcoes.size() || d.reservadoPorOpcao[d.opcoes[i]] == 0;
+      }
+      // admin: só configuração; contadores e ultimoUid intactos
+      function needConfigOk(d, r) {
+        return needValida(d)
+          && ((d.opcoes == r.opcoes && d.opcoesNorm == r.opcoesNorm) || opcoesNormOk(d))
+          && d.reservado == r.reservado
+          && d.ultimoUid == r.ultimoUid
+          && d.meta >= r.reservado
+          && (r.reservado == 0
+              ? d.reservadoPorOpcao.values().toSet().hasOnly([0])
+              : (d.opcoes.size() == r.opcoes.size()
+                 ? (d.opcoes == r.opcoes && d.reservadoPorOpcao == r.reservadoPorOpcao)
+                 : (d.opcoes.size() > r.opcoes.size()
+                    && (r.opcoes.size() == 0 || d.opcoes[0:r.opcoes.size()] == r.opcoes)
+                    && d.reservadoPorOpcao.diff(r.reservadoPorOpcao).affectedKeys()
+                         .hasOnly(d.opcoes[r.opcoes.size():d.opcoes.size()])
+                    && porNovaOk(d, r, 0) && porNovaOk(d, r, 1) && porNovaOk(d, r, 2) && porNovaOk(d, r, 3)
+                    && porNovaOk(d, r, 4) && porNovaOk(d, r, 5) && porNovaOk(d, r, 6) && porNovaOk(d, r, 7)
+                    && porNovaOk(d, r, 8) && porNovaOk(d, r, 9) && porNovaOk(d, r, 10) && porNovaOk(d, r, 11))));
+      }
+
+      function qtyAntes(p)  { return exists(p) ? get(p).data.qty : 0; }
+      function qtyDepois(p) { return existsAfter(p) ? getAfter(p).data.qty : 0; }
+      function pledgeMudou(p) {
+        return existsAfter(p) != exists(p)
+          || (existsAfter(p) && exists(p) && getAfter(p).data != get(p).data);
+      }
+
+      // qualquer usuário autenticado (inclusive admin): só contadores, e só
+      // acompanhando uma pledge {nid}_{ultimoUid} que realmente mudou.
+      function needContadorOk(eid, nid, d, r) {
+        let p = pledgeDoc(eid, nid + '_' + d.ultimoUid);
+        return signedIn()
+          && d.diff(r).affectedKeys().hasOnly(['reservado', 'reservadoPorOpcao', 'ultimoUid'])
+          && d.ultimoUid is string
+          && d.reservado is int && d.reservado >= 0 && d.reservado <= d.meta
+          && d.reservadoPorOpcao.keys().toSet() == r.reservadoPorOpcao.keys().toSet()
+          && pledgeMudou(p)
+          && d.reservado == r.reservado + qtyDepois(p) - qtyAntes(p);
+      }
+
+      match /needs/{nid} {
+        allow read: if eventoLegivel(eid);
+        allow create: if isAdmin() && needCriavel(request.resource.data);
+        allow update: if needContadorOk(eid, nid, request.resource.data, resource.data)
+                      || (isAdmin() && needConfigOk(request.resource.data, resource.data));
+        allow delete: if isAdmin() && resource.data.reservado == 0;
+      }
+
+      // ------------------------------------------------------------ pledge
+      function porChaveOk(k, n0, n1, o0, o1, q0, q1) {
+        return k == null
+          || n1.reservadoPorOpcao[k] == n0.reservadoPorOpcao[k] + (o1 == k ? q1 : 0) - (o0 == k ? q0 : 0);
+      }
+      // A need depois do commit precisa refletir exatamente o delta desta pledge.
+      function needOk(eid, nid, uid, o0, q0, o1, q1) {
+        let n0 = get(needDoc(eid, nid)).data;
+        let n1 = getAfter(needDoc(eid, nid)).data;
+        return n1.reservado == n0.reservado + q1 - q0
+          && n1.reservado <= n1.meta
+          && ((q1 == q0 && o1 == o0)
+              ? n1.reservadoPorOpcao == n0.reservadoPorOpcao
+              : (n1.ultimoUid == uid
+                 && n1.reservadoPorOpcao.diff(n0.reservadoPorOpcao).affectedKeys()
+                      .hasOnly((o0 == null ? [] : [o0]).concat(o1 == null ? [] : [o1]))
+                 && porChaveOk(o0, n0, n1, o0, o1, q0, q1)
+                 && porChaveOk(o1, n0, n1, o0, o1, q0, q1)
+                 && (o1 == null || n0.maxPorOpcao == null || n1.reservadoPorOpcao[o1] <= n0.maxPorOpcao)));
+      }
+      function opcaoPledgeOk(n, d) {
+        return (d.opcao == null || d.opcao is string)
+          && (d.textoOutro == null || (d.textoOutro is string && d.textoOutro.size() >= 1 && d.textoOutro.size() <= 40))
+          && (n.opcoes.size() > 0
+              ? ((d.opcao != null && d.textoOutro == null && d.opcao in n.opcoes)
+                 || (d.opcao == null && n.permiteOutro && d.textoOutro != null
+                     && !(norm(d.textoOutro) in n.opcoesNorm)))
+              : (d.opcao == null && (d.textoOutro == null || n.permiteOutro)));
+      }
+      function valoresPledgeOk(n, d) {
+        return d.qty is int && d.qty >= n.minPorPessoa && d.qty <= n.maxPorPessoa
+          && d.devolverAoFinal is bool
+          && opcaoPledgeOk(n, d);
+      }
+      function partOk(eid, uid, nid, delta) {
+        let pp = partDoc(eid, uid);
+        let antes = exists(pp) ? get(pp).data.ativas : 0;
+        let dep = getAfter(pp).data;
+        return dep.ativas == antes + delta && dep.ativas >= 0 && dep.ultimoNeedId == nid;
+      }
+      // log de cancelamento/redução tardia: qty acumulada += liberada
+      function logOk(eid, r, q0, q1) {
+        let cp = cancelDoc(eid, r.needId + '_' + r.uid);
+        return existsAfter(cp)
+          && getAfter(cp).data.qty == (exists(cp) ? get(cp).data.qty : 0) + q0 - q1;
+      }
+
+      function pledgeCriavel(eid, pid, d) {
+        let ev = evData(eid);
+        return signedIn()
+          && d.keys().hasOnly(['needId', 'uid', 'qty', 'opcao', 'textoOutro', 'primeiroNome',
+                               'devolverAoFinal', 'criadoEm', 'atualizadoEm'])
+          && d.keys().hasAll(['needId', 'uid', 'qty', 'opcao', 'textoOutro', 'primeiroNome',
+                              'devolverAoFinal', 'criadoEm', 'atualizadoEm'])
+          && d.uid == request.auth.uid
+          && d.needId is string
+          && pid == d.needId + '_' + d.uid
+          && d.primeiroNome == nomeEsperado()
+          && d.criadoEm == request.time && d.atualizadoEm == request.time
+          && ev.status == 'aberto' && request.time < ev.prazoContribuicoes
+          && notBlocked()
+          && valoresPledgeOk(get(needDoc(eid, d.needId)).data, d)
+          && needOk(eid, d.needId, d.uid, null, 0, d.opcao, d.qty)
+          && partOk(eid, d.uid, d.needId, 1)
+          && getAfter(partDoc(eid, d.uid)).data.ativas <= ev.maxNecessidadesPorPessoa;
+      }
+
+      function pledgeEditavel(eid, d, r) {
+        let ev = evData(eid);
+        let n = get(needDoc(eid, r.needId)).data;
+        return signedIn()
+          && r.uid == request.auth.uid
+          && d.diff(r).affectedKeys().hasOnly(['qty', 'opcao', 'textoOutro', 'devolverAoFinal', 'atualizadoEm'])
+          && d.atualizadoEm == request.time
+          && d.devolverAoFinal is bool
+          && ev.status == 'aberto' && request.time < ev.inicio
+          && (request.time < ev.prazoContribuicoes
+              // antes do prazo: edição livre (bloqueado só reduz)
+              ? ((d.qty < r.qty || notBlocked())
+                 && valoresPledgeOk(n, d)
+                 && needOk(eid, r.needId, r.uid, r.opcao, r.qty, d.opcao, d.qty))
+              // após o prazo: só reduzir (com log) ou mexer em devolverAoFinal
+              : (d.opcao == r.opcao && d.textoOutro == r.textoOutro
+                 && (d.qty == r.qty
+                     || (d.qty is int && d.qty < r.qty && d.qty >= n.minPorPessoa
+                         && logOk(eid, r, r.qty, d.qty)))
+                 && needOk(eid, r.needId, r.uid, r.opcao, r.qty, d.opcao, d.qty)));
+      }
+
+      function pledgeRemovivel(eid, r) {
+        return signedIn()
+          && (r.uid == request.auth.uid
+              ? (evData(eid).status == 'aberto' && request.time < evData(eid).inicio
+                 && (request.time < evData(eid).prazoContribuicoes || logOk(eid, r, r.qty, 0)))
+              : isAdmin())
+          && needOk(eid, r.needId, r.uid, r.opcao, r.qty, null, 0)
+          && partOk(eid, r.uid, r.needId, -1);
+      }
+
+      match /pledges/{pid} {
+        allow read: if eventoLegivel(eid);
+        allow create: if pledgeCriavel(eid, pid, request.resource.data);
+        allow update: if pledgeEditavel(eid, request.resource.data, resource.data);
+        allow delete: if pledgeRemovivel(eid, resource.data);
+      }
+
+      // ------------------------------------------------------------ participants
+      match /participants/{uid} {
+        allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+        allow create, update: if signedIn()
+          && (request.auth.uid == uid || isAdmin())
+          && request.resource.data.keys().hasOnly(['ativas', 'ultimoNeedId'])
+          && request.resource.data.keys().hasAll(['ativas', 'ultimoNeedId'])
+          && request.resource.data.ativas is int
+          && request.resource.data.ultimoNeedId is string
+          && request.resource.data.ativas >= 0
+          && request.resource.data.ativas ==
+               (resource == null ? 0 : resource.data.ativas)
+               + (existsAfter(pledgeDoc(eid, request.resource.data.ultimoNeedId + '_' + uid)) ? 1 : 0)
+               - (exists(pledgeDoc(eid, request.resource.data.ultimoNeedId + '_' + uid)) ? 1 : 0);
+        allow delete: if false;
+      }
+
+      // ------------------------------------------------------------ cancelamentos tardios
+      match /cancelamentos/{cid} {
+        // dono (id = {needId}_{uid}) lê o próprio log para acumular a qty; organização lê todos
+        allow read: if signedIn() && (cid.matches('.+_' + request.auth.uid) || isAdmin());
+        allow create, update: if cancelamentoOk(eid, cid, request.resource.data);
+        allow delete: if false;
+      }
+      function cancelamentoOk(eid, cid, d) {
+        let ev = evData(eid);
+        let p = pledgeDoc(eid, d.needId + '_' + d.uid);
+        return signedIn()
+          && d.keys().hasOnly(['needId', 'uid', 'primeiroNome', 'qty', 'em'])
+          && d.keys().hasAll(['needId', 'uid', 'primeiroNome', 'qty', 'em'])
+          && d.uid == request.auth.uid
+          && d.needId is string
+          && cid == d.needId + '_' + d.uid
+          && d.primeiroNome == nomeEsperado()
+          && d.em == request.time
+          && ev.status == 'aberto'
+          && request.time >= ev.prazoContribuicoes && request.time < ev.inicio
+          && exists(p) && qtyAntes(p) > qtyDepois(p)
+          && d.qty == (resource == null ? 0 : resource.data.qty) + qtyAntes(p) - qtyDepois(p);
+      }
+    }
+
+    // ---------------------------------------------------------------- demais
+    match /admins/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow write: if false; // só pelo console
+    }
+
+    match /blocked/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['motivo', 'em'])
+        && request.resource.data.motivo is string && request.resource.data.motivo.size() <= 200
+        && request.resource.data.em == request.time;
+      allow delete: if isAdmin();
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['nome', 'primeiroNome', 'email', 'ultimoLogin'])
+        && request.resource.data.keys().hasAll(['nome', 'primeiroNome', 'email', 'ultimoLogin'])
+        && request.resource.data.nome is string && request.resource.data.nome.size() <= 200
+        && request.resource.data.primeiroNome == nomeEsperado()
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.ultimoLogin == request.time;
+      allow delete: if false;
+    }
+  }
+}
