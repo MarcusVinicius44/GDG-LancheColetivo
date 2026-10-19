@@ -1,4 +1,4 @@
-import type { Categoria, EventStatus, Tag } from '@/config/constants'
+import type { EventStatus, Tag } from '@/config/constants'
 
 /** Modelo de dados (docs/PLANO.md). Datas já convertidas para `Date`. */
 export interface Evento {
@@ -13,12 +13,14 @@ export interface Evento {
   margem: number
   maxNecessidadesPorPessoa: number
   status: EventStatus
+  /** Categorias do evento, na ordem de exibição (padrão das 7 quando o doc não tem o campo). */
+  categorias: string[]
 }
 
 export interface Need {
   id: string
   nome: string
-  categoria: Categoria
+  categoria: string
   unidade: string
   meta: number
   reservado: number

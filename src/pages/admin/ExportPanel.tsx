@@ -32,7 +32,7 @@ export function ExportPanel({ evento, needs, pledges, usuarios }: Props) {
   }
 
   function baixarCsv() {
-    const blob = new Blob([gerarCsv(needs, pledges, usuarios)], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob([gerarCsv(needs, pledges, usuarios, evento.categorias)], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

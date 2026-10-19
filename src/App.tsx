@@ -4,6 +4,7 @@ import { Layout } from '@/components/Layout'
 import { AuthProvider } from '@/hooks/useAuth'
 import { AdminEvento } from '@/pages/admin/AdminEvento'
 import { AdminHome } from '@/pages/admin/AdminHome'
+import { AdminItens } from '@/pages/admin/AdminItens'
 import { EventPage } from '@/pages/EventPage'
 import { Home } from '@/pages/Home'
 import { Profile } from '@/pages/Profile'
@@ -20,6 +21,7 @@ export default function App() {
               <Route path="perfil" element={<Profile />} />
               <Route path="admin" element={<AdminHome />} />
               <Route path="admin/e/:id" element={<AdminEvento />} />
+              <Route path="admin/e/:id/itens" element={<AdminItens />} />
               <Route path="*" element={<Home />} />
             </Route>
           </Routes>

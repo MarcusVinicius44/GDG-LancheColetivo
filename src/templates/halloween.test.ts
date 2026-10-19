@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CATEGORIAS, MAX_OPCOES, TAGS } from '@/config/constants'
+import { CATEGORIAS_PADRAO, MAX_OPCOES, TAGS } from '@/config/constants'
 import { norm } from '@/lib/format'
 import { HALLOWEEN_EVENT, HALLOWEEN_NEEDS, needDoc } from '@/templates/halloween'
 
@@ -33,13 +33,21 @@ describe('template Halloween', () => {
 
   it('limites coerentes e dentro do que as rules aceitam', () => {
     for (const t of HALLOWEEN_NEEDS) {
-      expect(CATEGORIAS).toContain(t.categoria)
+      expect(HALLOWEEN_EVENT.categorias).toContain(t.categoria)
       expect(t.minPorPessoa, t.nome).toBeGreaterThanOrEqual(1)
       expect(t.maxPorPessoa, t.nome).toBeGreaterThanOrEqual(t.minPorPessoa)
       expect(t.minPorPessoa, t.nome).toBeLessThanOrEqual(t.meta)
       expect(t.opcoes.length).toBeLessThanOrEqual(MAX_OPCOES)
       expect(new Set(t.opcoes.map(norm)).size).toBe(t.opcoes.length)
       t.tags.forEach((tag) => expect(TAGS).toContain(tag))
+    }
+  })
+
+  it('categorias do evento = as 7 padrão; "devolver" só em Café & Cia, Descartáveis e Diversos', () => {
+    expect(HALLOWEEN_EVENT.categorias).toEqual([...CATEGORIAS_PADRAO])
+    for (const t of HALLOWEEN_NEEDS) {
+      const esperado = ['Café & Cia', 'Descartáveis', 'Diversos'].includes(t.categoria)
+      expect(t.tags.includes('devolver'), t.nome).toBe(esperado)
     }
   })
 

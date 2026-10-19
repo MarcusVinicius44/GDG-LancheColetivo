@@ -16,7 +16,7 @@ const h = (n: number) => new Date(AGORA.getTime() + n * 3600_000)
 const evento = (over: Partial<Evento> = {}): Evento => ({
   id: 'e1', titulo: 'x', descricao: '', local: '', inscritos: 0, publicoPlanejado: 90, margem: 0,
   maxNecessidadesPorPessoa: 2, status: 'aberto',
-  inicio: h(72), prazoContribuicoes: h(48), ...over,
+  inicio: h(72), prazoContribuicoes: h(48), categorias: ['Bebidas'], ...over,
 })
 const need = (over: Partial<Need> = {}): Need => ({
   id: 'n1', nome: 'Suco', categoria: 'Bebidas', unidade: '1L', meta: 12, reservado: 0,

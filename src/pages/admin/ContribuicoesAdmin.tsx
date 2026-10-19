@@ -10,13 +10,14 @@ import type { Need, Pledge } from '@/lib/types'
 
 interface Props {
   eventId: string
+  categorias: readonly string[]
   needs: Need[]
   pledges: Pledge[]
   usuarios: Map<string, Usuario>
   bloqueios: Bloqueio[]
 }
 
-export function ContribuicoesAdmin({ eventId, needs, pledges, usuarios, bloqueios }: Props) {
+export function ContribuicoesAdmin({ eventId, categorias, needs, pledges, usuarios, bloqueios }: Props) {
   const { user } = useAuth()
   const [confirmar, setConfirmar] = useState<string | null>(null)
   const [bloqueando, setBloqueando] = useState<string | null>(null)
@@ -43,7 +44,7 @@ export function ContribuicoesAdmin({ eventId, needs, pledges, usuarios, bloqueio
   const remover = (p: Pledge) =>
     rodar(() => cancelarPledge(db, eventId, p.needId, { uid: user!.uid, nome: user!.displayName }, { donoUid: p.uid }))
 
-  const comPledges = agruparPorCategoria(needs)
+  const comPledges = agruparPorCategoria(needs, categorias)
     .map((g) => ({ ...g, needs: g.needs.filter((n) => pledgesDaNeed(pledges, n.id).length > 0) }))
     .filter((g) => g.needs.length > 0)
 

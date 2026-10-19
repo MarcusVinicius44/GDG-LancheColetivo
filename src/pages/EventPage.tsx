@@ -14,15 +14,8 @@ import { formatDataHora } from '@/lib/format'
 import { agruparPorCategoria, completa, pledgesDaNeed, resumir } from '@/lib/needView'
 import { faseDoEvento } from '@/lib/pledgeLogic'
 
-const COR_CATEGORIA: Record<string, string> = {
-  Bebidas: 'bg-gdg-blue',
-  Salgados: 'bg-gdg-red',
-  Doces: 'bg-gdg-yellow',
-  'Pães & Frios': 'bg-gdg-green',
-  'Café & Cia': 'bg-gdg-blue',
-  Descartáveis: 'bg-gdg-red',
-  Diversos: 'bg-gdg-green',
-}
+/** Cores do GDG em rodízio pela posição da categoria na lista do evento. */
+const CORES_CATEGORIA = ['bg-gdg-blue', 'bg-gdg-red', 'bg-gdg-yellow', 'bg-gdg-green']
 
 export function EventPage() {
   const { id } = useParams()
@@ -36,7 +29,8 @@ export function EventPage() {
   const [abertaId, setAbertaId] = useState<string | null>(null)
 
   const minhas = usePledgesDe(pledges, user?.uid)
-  const grupos = useMemo(() => agruparPorCategoria(needs), [needs])
+  const categorias = evento?.categorias
+  const grupos = useMemo(() => agruparPorCategoria(needs, categorias), [needs, categorias])
   const resumo = useMemo(() => resumir(needs), [needs])
 
   if (loadingEv || authLoading) return <p className="text-muted">Carregando…</p>
@@ -125,10 +119,10 @@ export function EventPage() {
         <p className="card text-muted">A organização ainda não cadastrou os itens deste evento.</p>
       )}
 
-      {grupos.map((g) => (
-        <section key={g.categoria} className="space-y-3" aria-labelledby={`cat-${g.categoria}`}>
-          <h2 id={`cat-${g.categoria}`} className="flex items-center gap-2 text-lg font-medium">
-            <span aria-hidden className={`size-3 rounded-full ${COR_CATEGORIA[g.categoria] ?? 'bg-gdg-blue'}`} />
+      {grupos.map((g, i) => (
+        <section key={g.categoria} className="space-y-3" aria-labelledby={`cat-${i}`}>
+          <h2 id={`cat-${i}`} className="flex items-center gap-2 text-lg font-medium">
+            <span aria-hidden className={`size-3 rounded-full ${CORES_CATEGORIA[i % CORES_CATEGORIA.length]}`} />
             {g.categoria}
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">

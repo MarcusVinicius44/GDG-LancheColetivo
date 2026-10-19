@@ -1,5 +1,4 @@
-import type { Categoria, Tag } from '@/config/constants'
-import { normOpcoes } from '@/lib/format'
+import { CATEGORIAS_PADRAO, type Tag } from '@/config/constants'
 
 /**
  * Template do Coding Jam de Halloween (31/10/2026, UNINASSAU) — público 90, margem 0.
@@ -10,7 +9,7 @@ import { normOpcoes } from '@/lib/format'
 export interface NeedTemplate {
   id: string
   nome: string
-  categoria: Categoria
+  categoria: string
   unidade: string
   meta: number
   minPorPessoa: number
@@ -48,6 +47,7 @@ export const HALLOWEEN_EVENT = {
   publicoPlanejado: 90,
   margem: 0,
   maxNecessidadesPorPessoa: 2,
+  categorias: [...CATEGORIAS_PADRAO],
 } as const
 
 export const HALLOWEEN_NEEDS: NeedTemplate[] = [
@@ -63,13 +63,13 @@ export const HALLOWEEN_NEEDS: NeedTemplate[] = [
   // Café & Cia
   n({
     id: 'cafe-pronto', nome: 'Café pronto', categoria: 'Café & Cia', unidade: 'garrafa térmica 1L', meta: 14,
-    maxPorPessoa: 3, nota: 'A garrafa térmica volta para você no final, se quiser.',
+    maxPorPessoa: 3, nota: 'A garrafa térmica volta para você no final, se quiser.', tags: ['devolver'],
   }),
-  n({ id: 'leite', nome: 'Leite', categoria: 'Café & Cia', unidade: 'caixa 1L', meta: 6, maxPorPessoa: 3 }),
-  n({ id: 'acucar', nome: 'Açúcar', categoria: 'Café & Cia', unidade: 'pacote 1kg', meta: 3, maxPorPessoa: 2 }),
-  n({ id: 'adocante', nome: 'Adoçante', categoria: 'Café & Cia', unidade: 'frasco', meta: 2, maxPorPessoa: 1 }),
-  n({ id: 'copinhos-cafe', nome: 'Copinhos de café', categoria: 'Café & Cia', unidade: 'pacote 50un', meta: 4, maxPorPessoa: 2 }),
-  n({ id: 'mexedores', nome: 'Mexedores', categoria: 'Café & Cia', unidade: 'pacote', meta: 2, maxPorPessoa: 1 }),
+  n({ id: 'leite', nome: 'Leite', categoria: 'Café & Cia', unidade: 'caixa 1L', meta: 6, maxPorPessoa: 3, tags: ['devolver'] }),
+  n({ id: 'acucar', nome: 'Açúcar', categoria: 'Café & Cia', unidade: 'pacote 1kg', meta: 3, maxPorPessoa: 2, tags: ['devolver'] }),
+  n({ id: 'adocante', nome: 'Adoçante', categoria: 'Café & Cia', unidade: 'frasco', meta: 2, maxPorPessoa: 1, tags: ['devolver'] }),
+  n({ id: 'copinhos-cafe', nome: 'Copinhos de café', categoria: 'Café & Cia', unidade: 'pacote 50un', meta: 4, maxPorPessoa: 2, tags: ['devolver'] }),
+  n({ id: 'mexedores', nome: 'Mexedores', categoria: 'Café & Cia', unidade: 'pacote', meta: 2, maxPorPessoa: 1, tags: ['devolver'] }),
   // Salgados
   n({
     id: 'salgados', nome: 'Salgados', categoria: 'Salgados', unidade: 'unidade', meta: 330,
@@ -97,34 +97,15 @@ export const HALLOWEEN_NEEDS: NeedTemplate[] = [
   n({ id: 'manteiga', nome: 'Manteiga', categoria: 'Pães & Frios', unidade: 'pote', meta: 3, maxPorPessoa: 2 }),
   n({ id: 'requeijao', nome: 'Requeijão', categoria: 'Pães & Frios', unidade: 'pote', meta: 3, maxPorPessoa: 2 }),
   // Descartáveis
-  n({ id: 'pratos', nome: 'Pratos', categoria: 'Descartáveis', unidade: 'unidade', meta: 150, minPorPessoa: 25, maxPorPessoa: 100 }),
-  n({ id: 'copos', nome: 'Copos 200ml', categoria: 'Descartáveis', unidade: 'unidade', meta: 300, minPorPessoa: 25, maxPorPessoa: 100 }),
-  n({ id: 'guardanapos', nome: 'Guardanapos', categoria: 'Descartáveis', unidade: 'pacote 50un', meta: 8, maxPorPessoa: 4 }),
-  n({ id: 'talheres', nome: 'Talheres', categoria: 'Descartáveis', unidade: 'unidade', meta: 100, minPorPessoa: 25, maxPorPessoa: 100 }),
+  n({ id: 'pratos', nome: 'Pratos', categoria: 'Descartáveis', unidade: 'unidade', meta: 150, minPorPessoa: 25, maxPorPessoa: 100, tags: ['devolver'] }),
+  n({ id: 'copos', nome: 'Copos 200ml', categoria: 'Descartáveis', unidade: 'unidade', meta: 300, minPorPessoa: 25, maxPorPessoa: 100, tags: ['devolver'] }),
+  n({ id: 'guardanapos', nome: 'Guardanapos', categoria: 'Descartáveis', unidade: 'pacote 50un', meta: 8, maxPorPessoa: 4, tags: ['devolver'] }),
+  n({ id: 'talheres', nome: 'Talheres', categoria: 'Descartáveis', unidade: 'unidade', meta: 100, minPorPessoa: 25, maxPorPessoa: 100, tags: ['devolver'] }),
   // Diversos
-  n({ id: 'faca', nome: 'Faca', categoria: 'Diversos', unidade: 'unidade', meta: 2, maxPorPessoa: 1, nota: 'Volta para você no final.' }),
-  n({ id: 'saco-lixo', nome: 'Saco de lixo', categoria: 'Diversos', unidade: 'pacote', meta: 2, maxPorPessoa: 1 }),
-  n({ id: 'papel-toalha', nome: 'Papel toalha', categoria: 'Diversos', unidade: 'rolo', meta: 2, maxPorPessoa: 1 }),
+  n({ id: 'faca', nome: 'Faca', categoria: 'Diversos', unidade: 'unidade', meta: 2, maxPorPessoa: 1, nota: 'Volta para você no final.', tags: ['devolver'] }),
+  n({ id: 'saco-lixo', nome: 'Saco de lixo', categoria: 'Diversos', unidade: 'pacote', meta: 2, maxPorPessoa: 1, tags: ['devolver'] }),
+  n({ id: 'papel-toalha', nome: 'Papel toalha', categoria: 'Diversos', unidade: 'rolo', meta: 2, maxPorPessoa: 1, tags: ['devolver'] }),
 ]
 
-/** Documento exato que as rules esperam para uma need nova (contadores zerados). */
-export function needDoc(t: NeedTemplate, ordem: number) {
-  return {
-    nome: t.nome,
-    categoria: t.categoria,
-    unidade: t.unidade,
-    meta: t.meta,
-    reservado: 0,
-    minPorPessoa: t.minPorPessoa,
-    maxPorPessoa: t.maxPorPessoa,
-    opcoes: t.opcoes,
-    opcoesNorm: normOpcoes(t.opcoes),
-    maxPorOpcao: t.maxPorOpcao,
-    reservadoPorOpcao: Object.fromEntries(t.opcoes.map((o) => [o, 0])),
-    permiteOutro: t.permiteOutro,
-    nota: t.nota,
-    tags: t.tags,
-    ordem,
-    ultimoUid: null,
-  }
-}
+/** Documento de need nova (contadores zerados): mesma construção usada pela tela de itens. */
+export { needDoc } from '@/lib/needDoc'

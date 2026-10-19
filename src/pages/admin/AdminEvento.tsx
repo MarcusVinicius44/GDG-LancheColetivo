@@ -32,7 +32,8 @@ export function AdminEvento() {
 
   const resumo = useMemo(() => resumir(needs), [needs])
   const gaps = useMemo(() => lacunas(needs), [needs])
-  const grupos = useMemo(() => agruparPorCategoria(gaps.map((g) => g.need)), [gaps])
+  const categorias = evento?.categorias
+  const grupos = useMemo(() => agruparPorCategoria(gaps.map((g) => g.need), categorias), [gaps, categorias])
   const faltaDe = useMemo(() => new Map(gaps.map((g) => [g.need.id, g.faltam])), [gaps])
   const nomeDe = useMemo(() => new Map(needs.map((n) => [n.id, n])), [needs])
 
@@ -58,9 +59,14 @@ export function AdminEvento() {
         <Link to="/admin" className="text-sm text-gdg-blue">
           ← Administração
         </Link>
-        <Link to={`/e/${evento.id}`} className="btn-ghost">
-          Ver página pública
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link to={`/admin/e/${evento.id}/itens`} className="btn-primary">
+            Editar itens e metas
+          </Link>
+          <Link to={`/e/${evento.id}`} className="btn-ghost">
+            Ver página pública
+          </Link>
+        </div>
       </div>
 
       <section className="card space-y-4">
@@ -125,7 +131,7 @@ export function AdminEvento() {
         </section>
       )}
 
-      <ContribuicoesAdmin eventId={evento.id} needs={needs} pledges={pledges} usuarios={usuarios} bloqueios={bloqueios} />
+      <ContribuicoesAdmin eventId={evento.id} categorias={evento.categorias} needs={needs} pledges={pledges} usuarios={usuarios} bloqueios={bloqueios} />
 
       <ExportPanel evento={evento} needs={needs} pledges={pledges} usuarios={usuarios} />
     </div>

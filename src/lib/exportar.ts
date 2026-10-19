@@ -27,7 +27,7 @@ function cabecalho(ev: Evento, titulo: string): string[] {
 /** "Quem leva o quê", agrupado por categoria; itens sem ninguém aparecem como lacuna. */
 export function textoQuemLeva(ev: Evento, needs: Need[], pledges: Pledge[]): string {
   const linhas = cabecalho(ev, 'Quem leva o quê')
-  for (const g of agruparPorCategoria(needs)) {
+  for (const g of agruparPorCategoria(needs, ev.categorias)) {
     linhas.push(b(g.categoria))
     for (const n of g.needs) {
       const quem = pledgesDaNeed(pledges, n.id).map(descreverPledge)
@@ -46,7 +46,7 @@ export function textoFalta(ev: Evento, needs: Need[], link: string): string {
     return [...cabecalho(ev, 'Lanche coletivo'), '🎉 Tudo garantido! Obrigado a todo mundo que contribuiu.'].join('\n')
   }
   const linhas = cabecalho(ev, 'O que ainda falta')
-  for (const g of agruparPorCategoria(incompletos)) {
+  for (const g of agruparPorCategoria(incompletos, ev.categorias)) {
     linhas.push(b(g.categoria))
     for (const n of g.needs) {
       const opcoesLivres = n.opcoes.filter((o) => n.maxPorOpcao === null || (n.reservadoPorOpcao[o] ?? 0) < n.maxPorOpcao)
@@ -79,9 +79,14 @@ export const CSV_CABECALHO = ['Categoria', 'Item', 'Unidade', 'Nome', 'E-mail', 
  * CSV com `;` (abre direto no Excel pt-BR) e BOM UTF-8 (acentos). Inclui o
  * e-mail vindo de `users` — uso restrito à organização.
  */
-export function gerarCsv(needs: Need[], pledges: Pledge[], usuarios: Map<string, Usuario>): string {
+export function gerarCsv(
+  needs: Need[],
+  pledges: Pledge[],
+  usuarios: Map<string, Usuario>,
+  categorias?: readonly string[],
+): string {
   const linhas: Array<Array<string | number>> = [CSV_CABECALHO]
-  for (const g of agruparPorCategoria(needs)) {
+  for (const g of agruparPorCategoria(needs, categorias)) {
     for (const n of g.needs) {
       for (const p of pledgesDaNeed(pledges, n.id)) {
         const u = usuarios.get(p.uid)

@@ -83,9 +83,32 @@ describe('needView', () => {
     expect(resumir([])).toEqual({ total: 0, completas: 0, faltando: 0, percentual: 0 })
   })
 
-  it('permiteDevolver só em Café & Cia, Diversos e Descartáveis', () => {
-    expect(permiteDevolver(need({ categoria: 'Café & Cia' }))).toBe(true)
-    expect(permiteDevolver(need({ categoria: 'Diversos' }))).toBe(true)
-    expect(permiteDevolver(need({ categoria: 'Salgados' }))).toBe(false)
+  it('permiteDevolver depende da tag `devolver`, não da categoria', () => {
+    expect(permiteDevolver(need({ categoria: 'Salgados', tags: ['devolver'] }))).toBe(true)
+    expect(permiteDevolver(need({ categoria: 'Café & Cia', tags: [] }))).toBe(false)
+    expect(permiteDevolver(need({ tags: ['vegano'] }))).toBe(false)
+  })
+
+  describe('agruparPorCategoria com categorias do evento', () => {
+    const itens = [
+      need({ id: 'a', categoria: 'Frutas', ordem: 1 }),
+      need({ id: 'b', categoria: 'Bebidas', ordem: 1 }),
+      need({ id: 'c', categoria: 'Frutas', ordem: 0 }),
+    ]
+
+    it('segue a ordem da lista do evento', () => {
+      expect(agruparPorCategoria(itens, ['Frutas', 'Bebidas']).map((g) => g.categoria)).toEqual(['Frutas', 'Bebidas'])
+      expect(agruparPorCategoria(itens, ['Bebidas', 'Frutas']).map((g) => g.categoria)).toEqual(['Bebidas', 'Frutas'])
+    })
+
+    it('categoria vazia na lista some; itens de categoria fora da lista (órfãos) vão para o fim', () => {
+      const g = agruparPorCategoria(itens, ['Doces', 'Bebidas'])
+      expect(g.map((x) => x.categoria)).toEqual(['Bebidas', 'Frutas'])
+      expect(g[1]?.needs.map((n) => n.id)).toEqual(['c', 'a'])
+    })
+
+    it('sem lista usa as 7 categorias padrão', () => {
+      expect(agruparPorCategoria(itens).map((g) => g.categoria)).toEqual(['Bebidas', 'Frutas'])
+    })
   })
 })

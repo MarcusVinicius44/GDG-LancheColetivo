@@ -42,9 +42,25 @@ service cloud.firestore {
     function eventoLegivel(eid) {
       return evData(eid).status in ['aberto', 'fechado'] || isAdmin();
     }
+    // Categorias do evento: opcional (evento sem o campo usa as 7 padrão). Lista de 1 a 12
+    // nomes únicos de 1–30 caracteres; desenrolado por índice (sem laços nas rules).
+    function categoriasPadrao() {
+      return ['Bebidas', 'Salgados', 'Doces', 'Pães & Frios', 'Café & Cia', 'Descartáveis', 'Diversos'];
+    }
+    function categoriaOk(c, i) {
+      return c.size() <= i || (c[i] is string && c[i].matches('.{1,30}'));
+    }
+    function categoriasOk(c) {
+      return c is list && c.size() >= 1 && c.size() <= 12 && c.toSet().size() == c.size()
+        && categoriaOk(c, 0) && categoriaOk(c, 1) && categoriaOk(c, 2) && categoriaOk(c, 3)
+        && categoriaOk(c, 4) && categoriaOk(c, 5) && categoriaOk(c, 6) && categoriaOk(c, 7)
+        && categoriaOk(c, 8) && categoriaOk(c, 9) && categoriaOk(c, 10) && categoriaOk(c, 11);
+    }
     function eventoValido(d) {
       return d.keys().hasOnly(['titulo', 'descricao', 'local', 'inicio', 'prazoContribuicoes', 'inscritos',
-                               'publicoPlanejado', 'margem', 'maxNecessidadesPorPessoa', 'status', 'criadoEm'])
+                               'publicoPlanejado', 'margem', 'maxNecessidadesPorPessoa', 'status', 'criadoEm',
+                               'categorias'])
+        && (!('categorias' in d) || categoriasOk(d.categorias))
         && d.keys().hasAll(['titulo', 'descricao', 'local', 'inicio', 'prazoContribuicoes', 'inscritos',
                             'publicoPlanejado', 'margem', 'maxNecessidadesPorPessoa', 'status', 'criadoEm'])
         && d.titulo is string && d.titulo.size() >= 1 && d.titulo.size() <= 120
@@ -77,6 +93,15 @@ service cloud.firestore {
           && opcaoNormOk(d, 4) && opcaoNormOk(d, 5) && opcaoNormOk(d, 6) && opcaoNormOk(d, 7)
           && opcaoNormOk(d, 8) && opcaoNormOk(d, 9) && opcaoNormOk(d, 10) && opcaoNormOk(d, 11);
       }
+      // Acréscimo de UMA opção ao fim da lista: o prefixo (já validado no create) vem idêntico e só a
+      // nova paga o norm(). Custo constante — ao contrário de validar as 12 posições desenroladas,
+      // que estoura o limite de 1000 expressões. O cliente faz uma escrita por opção nova.
+      function acrescimoUmaOpcaoOk(d, r) {
+        let n = r.opcoes.size();
+        return d.opcoes.size() == n + 1
+          && (n == 0 || (d.opcoes[0:n] == r.opcoes && d.opcoesNorm[0:n] == r.opcoesNorm))
+          && d.opcoesNorm[n] == norm(d.opcoes[n]);
+      }
       // Limite de 1000 expressões por avaliação: o norm() das opções (caro) só
       // roda quando as opções mudam.
       function needValida(d) {
@@ -85,7 +110,7 @@ service cloud.firestore {
                               'opcoes', 'maxPorOpcao', 'opcoesNorm', 'reservadoPorOpcao', 'permiteOutro',
                               'nota', 'tags', 'ordem', 'ultimoUid'])
           && d.nome.matches('.{1,80}')
-          && d.categoria in ['Bebidas', 'Salgados', 'Doces', 'Pães & Frios', 'Café & Cia', 'Descartáveis', 'Diversos']
+          && d.categoria in evData(eid).get('categorias', categoriasPadrao())
           && d.unidade.matches('.{1,40}')
           && d.meta is int && d.meta >= 1 && d.meta <= 5000
           && d.reservado is int && d.reservado >= 0
@@ -97,7 +122,7 @@ service cloud.firestore {
           && (d.maxPorOpcao == null || (d.maxPorOpcao is int && d.maxPorOpcao >= 1))
           && d.permiteOutro is bool
           && d.nota.matches('(?s).{0,200}')
-          && d.tags is list && d.tags.size() <= 3 && d.tags.hasOnly(['vegano', 'sem-gluten', 'sem-lactose'])
+          && d.tags is list && d.tags.size() <= 4 && d.tags.hasOnly(['vegano', 'sem-gluten', 'sem-lactose', 'devolver'])
           && d.ordem is int
           && (d.ultimoUid == null || d.ultimoUid is string)
           // correção 3: sem "outro", as opções precisam comportar a meta
@@ -112,14 +137,12 @@ service cloud.firestore {
           && d.ultimoUid == null
           && d.reservadoPorOpcao.values().toSet().hasOnly([0]);
       }
-      // reservado>0: opções só são acrescentadas (prefixo preservado) e as novas entram com 0.
-      function porNovaOk(d, r, i) {
-        return d.opcoes.size() <= i || i < r.opcoes.size() || d.reservadoPorOpcao[d.opcoes[i]] == 0;
-      }
-      // admin: só configuração; contadores e ultimoUid intactos
+      // admin: só configuração; contadores e ultimoUid intactos.
+      // reservado>0: opções só são acrescentadas no fim (prefixo preservado), UMA por escrita, com contador 0.
       function needConfigOk(d, r) {
         return needValida(d)
-          && ((d.opcoes == r.opcoes && d.opcoesNorm == r.opcoesNorm) || opcoesNormOk(d))
+          && ((d.opcoes == r.opcoes && d.opcoesNorm == r.opcoesNorm)
+              || acrescimoUmaOpcaoOk(d, r) || opcoesNormOk(d))
           && d.reservado == r.reservado
           && d.ultimoUid == r.ultimoUid
           && d.meta >= r.reservado
@@ -127,13 +150,11 @@ service cloud.firestore {
               ? d.reservadoPorOpcao.values().toSet().hasOnly([0])
               : (d.opcoes.size() == r.opcoes.size()
                  ? (d.opcoes == r.opcoes && d.reservadoPorOpcao == r.reservadoPorOpcao)
-                 : (d.opcoes.size() > r.opcoes.size()
+                 : (d.opcoes.size() == r.opcoes.size() + 1
                     && (r.opcoes.size() == 0 || d.opcoes[0:r.opcoes.size()] == r.opcoes)
                     && d.reservadoPorOpcao.diff(r.reservadoPorOpcao).affectedKeys()
-                         .hasOnly(d.opcoes[r.opcoes.size():d.opcoes.size()])
-                    && porNovaOk(d, r, 0) && porNovaOk(d, r, 1) && porNovaOk(d, r, 2) && porNovaOk(d, r, 3)
-                    && porNovaOk(d, r, 4) && porNovaOk(d, r, 5) && porNovaOk(d, r, 6) && porNovaOk(d, r, 7)
-                    && porNovaOk(d, r, 8) && porNovaOk(d, r, 9) && porNovaOk(d, r, 10) && porNovaOk(d, r, 11))));
+                         .hasOnly([d.opcoes[r.opcoes.size()]])
+                    && d.reservadoPorOpcao[d.opcoes[r.opcoes.size()]] == 0)));
       }
 
       function qtyAntes(p)  { return exists(p) ? get(p).data.qty : 0; }

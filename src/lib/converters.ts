@@ -1,4 +1,5 @@
 import type { DocumentData, DocumentSnapshot, QueryDocumentSnapshot, Timestamp } from 'firebase/firestore'
+import { CATEGORIAS_PADRAO } from '@/config/constants'
 import type { Evento, Need, Pledge } from '@/lib/types'
 
 type Snap = DocumentSnapshot | QueryDocumentSnapshot
@@ -20,6 +21,7 @@ export function eventoDe(s: Snap): Evento {
     margem: d.margem ?? 0,
     maxNecessidadesPorPessoa: d.maxNecessidadesPorPessoa ?? 1,
     status: d.status ?? 'rascunho',
+    categorias: Array.isArray(d.categorias) && d.categorias.length > 0 ? d.categorias : [...CATEGORIAS_PADRAO],
   }
 }
 

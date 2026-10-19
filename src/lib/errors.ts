@@ -63,6 +63,30 @@ export function codigoDoSdk(e: unknown): string | undefined {
   return typeof c === 'string' ? c.replace(/^firestore\//, '') : undefined
 }
 
+/**
+ * Mensagem em pt-BR para falhas das ações de organização (itens, categorias, evento).
+ * Erros de domínio já escritos em pt-BR (`Error` sem código do SDK) passam como estão.
+ */
+export function mensagemErroAdmin(e: unknown): string {
+  switch (codigoDoSdk(e)) {
+    case 'permission-denied':
+      return 'O servidor recusou a alteração. Isso costuma acontecer quando alguém acabou de contribuir neste item ou outro organizador mexeu nele. Atualize a página e tente de novo.'
+    case 'aborted':
+    case 'failed-precondition':
+      return MENSAGENS.concorrencia
+    case 'unavailable':
+    case 'deadline-exceeded':
+    case 'cancelled':
+      return MENSAGENS.rede
+    case 'unauthenticated':
+      return MENSAGENS['nao-logado']
+    case undefined:
+      return e instanceof Error && e.message ? e.message : MENSAGENS.desconhecido
+    default:
+      return MENSAGENS.desconhecido
+  }
+}
+
 /** Mapeamento sem diagnóstico (quando não dá para reler o estado). */
 export function traduzirErroSdk(e: unknown): PledgeError {
   if (e instanceof PledgeError) return e

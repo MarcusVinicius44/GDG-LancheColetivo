@@ -1,4 +1,4 @@
-import { CATEGORIAS, type Categoria } from '@/config/constants'
+import { CATEGORIAS_PADRAO } from '@/config/constants'
 import type { Need, Pledge } from '@/lib/types'
 
 /** Funções puras de apresentação das necessidades (sem Firebase). */
@@ -29,16 +29,22 @@ export function maxParaMim(n: Need, minha: Pledge | null, opcao: string | null):
 }
 
 export interface Grupo {
-  categoria: Categoria
+  categoria: string
   needs: Need[]
 }
 
-/** Agrupa na ordem fixa das categorias; dentro, pela `ordem`. Categorias vazias somem. */
-export function agruparPorCategoria(needs: Need[]): Grupo[] {
-  return CATEGORIAS.map((categoria) => ({
-    categoria,
-    needs: needs.filter((n) => n.categoria === categoria).sort((a, b) => a.ordem - b.ordem),
-  })).filter((g) => g.needs.length > 0)
+/**
+ * Agrupa na ordem das categorias do evento; dentro, pela `ordem`. Categorias vazias somem.
+ * Itens de uma categoria que não está na lista (órfãos) aparecem no fim, nunca somem.
+ */
+export function agruparPorCategoria(needs: Need[], categorias: readonly string[] = CATEGORIAS_PADRAO): Grupo[] {
+  const orfas = [...new Set(needs.map((n) => n.categoria).filter((c) => !categorias.includes(c)))]
+  return [...categorias, ...orfas]
+    .map((categoria) => ({
+      categoria,
+      needs: needs.filter((n) => n.categoria === categoria).sort((a, b) => a.ordem - b.ordem),
+    }))
+    .filter((g) => g.needs.length > 0)
 }
 
 export const pledgesDaNeed = (pledges: Pledge[], needId: string) =>
@@ -70,6 +76,5 @@ export function resumir(needs: Need[]): Resumo {
   }
 }
 
-/** Itens em que faz sentido oferecer "levar de volta no final". */
-export const permiteDevolver = (n: Need) =>
-  n.categoria === 'Café & Cia' || n.categoria === 'Diversos' || n.categoria === 'Descartáveis'
+/** Itens que a pessoa pode levar de volta no final (tag `devolver`, definida pela organização). */
+export const permiteDevolver = (n: Need) => n.tags.includes('devolver')

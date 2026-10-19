@@ -3,7 +3,7 @@ import { Link, Navigate } from 'react-router'
 import { db } from '@/config/firebase'
 import { useAuth } from '@/hooks/useAuth'
 import { useAgora, useEventos } from '@/hooks/useFirestore'
-import { criarEventoHalloween, fecharEvento, publicarEvento } from '@/lib/eventos'
+import { criarEventoHalloween, criarEventoTeste, EVENTO_TESTE, fecharEvento, publicarEvento } from '@/lib/eventos'
 import { rotuloFase } from '@/lib/fase'
 import { formatDataHora } from '@/lib/format'
 import { HALLOWEEN_EVENT, HALLOWEEN_NEEDS } from '@/templates/halloween'
@@ -19,6 +19,7 @@ export function AdminHome() {
   if (!isAdmin) return <Navigate to="/" replace />
 
   const jaExiste = eventos.some((e) => e.id === HALLOWEEN_EVENT.id)
+  const jaExisteTeste = eventos.some((e) => e.id === EVENTO_TESTE.id)
 
   async function rodar(chave: string, fn: () => Promise<unknown>) {
     setOcupado(chave)
@@ -60,6 +61,24 @@ export function AdminHome() {
         </section>
       )}
 
+      {!jaExisteTeste && (
+        <section className="card space-y-2">
+          <h2 className="text-lg font-medium">Evento de teste</h2>
+          <p className="text-sm text-muted">
+            Cópia do Halloween chamada “{EVENTO_TESTE.titulo}”, para testar em produção sem sujar o evento real. Também
+            nasce como <strong>rascunho</strong>.
+          </p>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={ocupado !== null}
+            onClick={() => rodar('teste', () => criarEventoTeste(db))}
+          >
+            {ocupado === 'teste' ? 'Criando…' : 'Criar evento de teste (rascunho)'}
+          </button>
+        </section>
+      )}
+
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Eventos</h2>
         {eventos.length === 0 && <p className="text-sm text-muted">Nenhum evento ainda.</p>}
@@ -77,6 +96,9 @@ export function AdminHome() {
               <div className="flex flex-wrap gap-2">
                 <Link to={`/admin/e/${ev.id}`} className="btn-primary">
                   Gerenciar
+                </Link>
+                <Link to={`/admin/e/${ev.id}/itens`} className="btn-ghost">
+                  Itens e metas
                 </Link>
                 <Link to={`/e/${ev.id}`} className="btn-ghost">
                   Página pública

@@ -16,6 +16,7 @@ const ev: Evento = {
   id: 'e1', titulo: 'Coding Jam', descricao: '', local: 'UNINASSAU', inscritos: 0, publicoPlanejado: 90, margem: 0,
   maxNecessidadesPorPessoa: 2, status: 'aberto',
   inicio: new Date('2026-10-31T11:30:00Z'), prazoContribuicoes: new Date('2026-10-29T21:00:00Z'),
+  categorias: ['Bebidas', 'Pães & Frios', 'Café & Cia'],
 }
 const need = (o: Partial<Need> = {}): Need => ({
   id: 'n1', nome: 'Refrigerante', categoria: 'Bebidas', unidade: 'garrafa 2L', meta: 10, reservado: 0, minPorPessoa: 1,
