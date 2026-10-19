@@ -1,9 +1,13 @@
 import { Link } from 'react-router'
+import { ComoFunciona } from '@/components/ComoFunciona'
+import { useAuth } from '@/hooks/useAuth'
 import { useAgora, useEventos } from '@/hooks/useFirestore'
+import { isInAppBrowser } from '@/lib/inAppBrowser'
 import { rotuloFase } from '@/lib/fase'
 import { formatDataHora } from '@/lib/format'
 
 export function Home() {
+  const { user, loading: authLoading, signIn } = useAuth()
   const { data: eventos, loading, error } = useEventos()
   const agora = useAgora()
 
@@ -11,10 +15,23 @@ export function Home() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-medium">Lanche Coletivo</h1>
-        <p className="text-muted">
+        <p className="mb-3 text-muted">
           Coffee break feito por todo mundo: escolha o que você leva e acompanhe o que ainda falta.
         </p>
+        <ComoFunciona />
       </div>
+
+      {!authLoading && !user && !isInAppBrowser() && (
+        <div className="card flex flex-wrap items-center gap-3 border-gdg-blue">
+          <p className="min-w-0 flex-1 text-sm">
+            <strong>Para escolher o que levar, entre com a sua conta Google.</strong> Você só precisa entrar na hora de
+            contribuir; para ver os eventos não precisa.
+          </p>
+          <button type="button" className="btn-primary" onClick={() => void signIn()}>
+            Entrar com Google
+          </button>
+        </div>
+      )}
 
       {loading && <p className="text-muted">Carregando eventos…</p>}
       {error && (

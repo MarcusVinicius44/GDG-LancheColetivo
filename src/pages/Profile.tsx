@@ -23,7 +23,7 @@ export function Profile() {
       <h1 className="text-xl font-medium">Meu perfil</h1>
       <p className="text-sm">{user.displayName}</p>
       <div>
-        <p className="text-sm text-muted">Seu UID (envie à organização para virar admin):</p>
+        <p className="text-sm text-muted">Seu UID:</p>
         <code className="block break-all rounded-xl bg-surface p-3 text-sm">{user.uid}</code>
       </div>
       <button type="button" className="btn-primary" onClick={copiar}>

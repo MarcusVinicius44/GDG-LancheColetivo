@@ -58,11 +58,13 @@ export function useEventos(): Live<Evento[]> {
         ? null
         : isAdmin
           ? query(collection(db, 'events'), orderBy('inicio', 'desc'))
-          : query(collection(db, 'events'), where('status', 'in', ['aberto', 'fechado']), orderBy('inicio', 'desc')),
+          : // sem orderBy: `in` + orderBy exigiria índice composto (o emulador não cobra, o Firestore real sim)
+            query(collection(db, 'events'), where('status', 'in', ['aberto', 'fechado'])),
     eventoDe,
     `eventos:${loading}:${isAdmin}`,
   )
-  return loading ? { ...live, loading: true } : live
+  const ordenados = useMemo(() => [...live.data].sort((a, b) => b.inicio.getTime() - a.inicio.getTime()), [live.data])
+  return { ...live, data: ordenados, loading: loading || live.loading }
 }
 
 export function useEvento(id: string | undefined): Live<Evento | null> {

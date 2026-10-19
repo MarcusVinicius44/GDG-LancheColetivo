@@ -35,12 +35,12 @@ export function Layout() {
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-10 border-b border-line bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-2 sm:py-3">
+        <div className="mx-auto flex max-w-3xl flex-col items-center gap-2 px-4 py-3 sm:flex-row sm:justify-between sm:gap-x-3">
           <Link to="/" className="flex min-w-0 items-center gap-3 font-medium" aria-label="Lanche Coletivo — GDG Aracaju">
-            <img src={gdgLogo} alt="Google Developer Groups" className="h-6 w-auto shrink-0 sm:h-8" />
+            <img src={gdgLogo} alt="Google Developer Groups" className="h-7 w-auto shrink-0 sm:h-8" />
             <span className="hidden truncate border-l border-line pl-3 sm:inline">Lanche Coletivo</span>
           </Link>
-          <nav className="ml-auto flex items-center gap-2 text-sm">
+          <nav className="flex flex-wrap items-center justify-center gap-2 text-sm">
             {isAdmin && (
               <Link to="/admin" className="btn-ghost">
                 Admin
