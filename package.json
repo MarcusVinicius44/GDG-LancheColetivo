@@ -11,7 +11,7 @@
     "typecheck": "tsc -b",
     "test:unit": "vitest run --config vitest.unit.config.ts",
     "test:rules": "firebase emulators:exec --config firebase.test.json --only firestore --project demo-lanche-coletivo \"vitest run --config vitest.rules.config.ts\"",
-    "emulators": "firebase emulators:start --only auth,firestore",
+    "emulators": "firebase emulators:start --only auth,firestore --project demo-lanche-coletivo",
     "seed:emulator": "tsx scripts/seed-emulator.ts"
   },
   "dependencies": {
