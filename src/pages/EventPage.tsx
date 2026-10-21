@@ -27,10 +27,13 @@ export function EventPage() {
   const acoes = usePledgeActions(id ?? '')
   const crabuntu = useCrabuntu()
   const [abertaId, setAbertaId] = useState<string | null>(null)
+  const [filtro, setFiltro] = useState<string | null>(null)
 
   const minhas = usePledgesDe(pledges, user?.uid)
   const categorias = evento?.categorias
   const grupos = useMemo(() => agruparPorCategoria(needs, categorias), [needs, categorias])
+  // Um filtro que não existe mais (categoria renomeada ou removida) volta a mostrar tudo.
+  const filtroAtivo = grupos.some((g) => g.categoria === filtro) ? filtro : null
   const resumo = useMemo(() => resumir(needs), [needs])
 
   if (loadingEv || authLoading) return <p className="text-muted">Carregando…</p>
@@ -119,7 +122,31 @@ export function EventPage() {
         <p className="card text-muted">A organização ainda não cadastrou os itens deste evento.</p>
       )}
 
-      {grupos.map((g, i) => (
+      {grupos.length > 1 && (
+        <div role="group" aria-label="Filtrar por categoria" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+          {[{ categoria: null as string | null, rotulo: 'Todas' }, ...grupos.map((g) => ({ categoria: g.categoria, rotulo: g.categoria }))].map(
+            (c) => {
+              const ativo = filtroAtivo === c.categoria
+              return (
+                <button
+                  key={c.rotulo}
+                  type="button"
+                  aria-pressed={ativo}
+                  onClick={() => setFiltro(c.categoria)}
+                  className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-medium ${
+                    ativo ? 'border-gdg-blue bg-gdg-blue text-white' : 'border-line bg-white text-ink'
+                  }`}
+                >
+                  {c.rotulo}
+                </button>
+              )
+            },
+          )}
+        </div>
+      )}
+
+      {grupos.map((g, i) =>
+        filtroAtivo && g.categoria !== filtroAtivo ? null : (
         <section key={g.categoria} className="space-y-3" aria-labelledby={`cat-${i}`}>
           <h2 id={`cat-${i}`} className="flex items-center gap-2 text-lg font-medium">
             <span aria-hidden className={`size-3 rounded-full ${CORES_CATEGORIA[i % CORES_CATEGORIA.length]}`} />
@@ -138,7 +165,8 @@ export function EventPage() {
             ))}
           </div>
         </section>
-      ))}
+        ),
+      )}
 
       {abertaNeed && (
         <PledgeModal
